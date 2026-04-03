@@ -1,33 +1,37 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "eu.ansvar/italian-cybersecurity-mcp",
-  "description": "Query ACN (Agenzia per la Cybersicurezza Nazionale) guidance including Piano Strategico Nazionale per la Cybersicurezza, Misure Minime di Sicurezza, and CSIRT-ITA advisories",
+  "description": "ACN (Italian National Cybersecurity Agency) MCP server — guidance, advisories, and cybersecurity frameworks",
   "repository": {
     "url": "https://github.com/Ansvar-Systems/italian-cybersecurity-mcp",
     "source": "github"
   },
   "homepage": "https://ansvar.eu",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "license": "Apache-2.0",
   "keywords": [
-    "acn",
-    "italian-cybersecurity",
-    "csirt-ita",
-    "nis2",
     "cybersecurity",
     "italy",
-    "information-security",
+    "regulation",
     "compliance",
-    "mcp",
-    "ansvar"
+    "mcp"
   ],
   "packages": [
     {
       "registryType": "npm",
       "identifier": "@ansvar/italian-cybersecurity-mcp",
-      "version": "0.1.0",
+      "version": "1.0.0",
       "transport": {
         "type": "stdio"
+      }
+    },
+    {
+      "registryType": "npm",
+      "identifier": "@ansvar/italian-cybersecurity-mcp",
+      "version": "1.0.0",
+      "transport": {
+        "type": "streamable-http",
+        "url": "https://mcp.ansvar.eu/italian-cybersecurity/mcp"
       }
     }
   ]
