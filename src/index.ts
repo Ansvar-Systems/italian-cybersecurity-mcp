@@ -26,6 +26,7 @@ import {
   searchAdvisories,
   getAdvisory,
   listFrameworks,
+  getDataAge,
 } from "./db.js";
 import { buildCitation } from "./utils/citation.js";
 
@@ -182,6 +183,16 @@ const GetAdvisoryArgs = z.object({
 
 // --- Helper ------------------------------------------------------------------
 
+function responseMeta() {
+  return {
+    disclaimer:
+      "This data is provided for informational purposes only. Verify with official ACN/CSIRT-ITA sources before taking action.",
+    data_age: getDataAge(),
+    copyright: "© Agenzia per la Cybersicurezza Nazionale (ACN). All rights reserved.",
+    source_url: "https://www.acn.gov.it/",
+  };
+}
+
 function textContent(data: unknown) {
   return {
     content: [
@@ -190,9 +201,14 @@ function textContent(data: unknown) {
   };
 }
 
-function errorContent(message: string) {
+function errorContent(message: string, errorType = "tool_error") {
   return {
-    content: [{ type: "text" as const, text: message }],
+    content: [
+      {
+        type: "text" as const,
+        text: JSON.stringify({ error: message, _error_type: errorType, _meta: responseMeta() }, null, 2),
+      },
+    ],
     isError: true as const,
   };
 }
@@ -222,14 +238,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           status: parsed.status,
           limit: parsed.limit,
         });
-        return textContent({ results, count: results.length });
+        const resultsWithCitations = results.map((r) => {
+          const d = r as Record<string, unknown>;
+          return {
+            ...r,
+            _citation: buildCitation(
+              String(d.reference ?? ""),
+              String(d.title ?? d.reference ?? ""),
+              "it_cyber_get_guidance",
+              { reference: String(d.reference ?? "") },
+            ),
+          };
+        });
+        return textContent({ results: resultsWithCitations, count: results.length, _meta: responseMeta() });
       }
 
       case "it_cyber_get_guidance": {
         const parsed = GetGuidanceArgs.parse(args);
         const doc = getGuidance(parsed.reference);
         if (!doc) {
-          return errorContent(`Guidance document not found: ${parsed.reference}`);
+          return errorContent(`Guidance document not found: ${parsed.reference}`, "not_found");
         }
         const d = doc as Record<string, unknown>;
         return textContent({
@@ -240,6 +268,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             "it_cyber_get_guidance",
             { reference: parsed.reference },
           ),
+          _meta: responseMeta(),
         });
       }
 
@@ -250,14 +279,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           severity: parsed.severity,
           limit: parsed.limit,
         });
-        return textContent({ results, count: results.length });
+        const resultsWithCitations = results.map((r) => {
+          const adv = r as Record<string, unknown>;
+          return {
+            ...r,
+            _citation: buildCitation(
+              String(adv.reference ?? ""),
+              String(adv.title ?? adv.reference ?? ""),
+              "it_cyber_get_advisory",
+              { reference: String(adv.reference ?? "") },
+            ),
+          };
+        });
+        return textContent({ results: resultsWithCitations, count: results.length, _meta: responseMeta() });
       }
 
       case "it_cyber_get_advisory": {
         const parsed = GetAdvisoryArgs.parse(args);
         const advisory = getAdvisory(parsed.reference);
         if (!advisory) {
-          return errorContent(`Advisory not found: ${parsed.reference}`);
+          return errorContent(`Advisory not found: ${parsed.reference}`, "not_found");
         }
         const adv = advisory as Record<string, unknown>;
         return textContent({
@@ -268,12 +309,13 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             "it_cyber_get_advisory",
             { reference: parsed.reference },
           ),
+          _meta: responseMeta(),
         });
       }
 
       case "it_cyber_list_frameworks": {
         const frameworks = listFrameworks();
-        return textContent({ frameworks, count: frameworks.length });
+        return textContent({ frameworks, count: frameworks.length, _meta: responseMeta() });
       }
 
       case "it_cyber_about": {
@@ -289,15 +331,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
             frameworks: "PSNC, Misure Minime, NIS2",
           },
           tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
+          _meta: responseMeta(),
         });
       }
 
       default:
-        return errorContent(`Unknown tool: ${name}`);
+        return errorContent(`Unknown tool: ${name}`, "unknown_tool");
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    return errorContent(`Error executing ${name}: ${message}`);
+    return errorContent(`Error executing ${name}: ${message}`, "internal_error");
   }
 });
 

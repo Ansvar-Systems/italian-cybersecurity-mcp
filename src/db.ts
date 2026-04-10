@@ -261,3 +261,27 @@ export function listFrameworks(): Framework[] {
     .prepare("SELECT * FROM frameworks ORDER BY id")
     .all() as Framework[];
 }
+
+// --- Meta helpers -------------------------------------------------------------
+
+/**
+ * Return the most recent document date across guidance and advisories tables.
+ * Falls back to '2024-01-01' if the DB is empty or unavailable.
+ */
+export function getDataAge(): string {
+  try {
+    const db = getDb();
+    const row = db
+      .prepare(
+        `SELECT MAX(date_val) as max_date FROM (
+           SELECT date as date_val FROM guidance WHERE date IS NOT NULL
+           UNION ALL
+           SELECT date as date_val FROM advisories WHERE date IS NOT NULL
+         )`,
+      )
+      .get() as { max_date: string | null } | undefined;
+    return row?.max_date ?? "2024-01-01";
+  } catch {
+    return "2024-01-01";
+  }
+}
