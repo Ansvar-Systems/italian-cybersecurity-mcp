@@ -1,0 +1,57 @@
+{
+  "source_type": "cybersecurity",
+  "jurisdiction": "IT",
+  "issuing_bodies": [
+    {
+      "id": "ACN",
+      "name": "Agenzia per la Cybersicurezza Nazionale",
+      "name_en": "Italian National Cybersecurity Agency",
+      "url": "https://www.acn.gov.it/"
+    },
+    {
+      "id": "CSIRT-ITA",
+      "name": "Computer Security Incident Response Team Italia",
+      "name_en": "Italian National CSIRT",
+      "url": "https://www.csirt.gov.it/"
+    }
+  ],
+  "categories": [
+    "guidance",
+    "framework",
+    "technical",
+    "board",
+    "advisory"
+  ],
+  "series": [
+    {
+      "id": "PSNC",
+      "name": "Piano Strategico Nazionale per la Cybersicurezza",
+      "name_en": "National Strategic Plan for Cybersecurity",
+      "issuer": "ACN"
+    },
+    {
+      "id": "MiSE",
+      "name": "Misure Minime di Sicurezza ICT",
+      "name_en": "Minimum ICT Security Measures",
+      "issuer": "ACN"
+    },
+    {
+      "id": "ACN",
+      "name": "ACN Technical Publications",
+      "name_en": "ACN Technical Publications",
+      "issuer": "ACN"
+    },
+    {
+      "id": "NIS2",
+      "name": "Guidance NIS2",
+      "name_en": "NIS2 Directive Implementation Guidance",
+      "issuer": "ACN"
+    },
+    {
+      "id": "CSIRT-ADV",
+      "name": "CSIRT-ITA Advisory",
+      "name_en": "CSIRT-ITA Security Advisory",
+      "issuer": "CSIRT-ITA"
+    }
+  ]
+}
