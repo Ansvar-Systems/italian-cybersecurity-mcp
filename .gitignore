@@ -102,3 +102,4 @@ temp/
 .vercel
 database.db
 reports/
+.local-build/
