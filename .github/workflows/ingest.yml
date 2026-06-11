@@ -1,0 +1,55 @@
+name: Ingest Data
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ingest:
+    name: Run ingest and publish DB
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run ingest
+        run: npm run ingest
+        env:
+          ACN_DB_PATH: data/acn.db
+
+      - name: Compress database
+        run: |
+          cp data/acn.db database.db
+          gzip -9 database.db
+          echo "Compressed: $(du -sh database.db.gz | cut -f1)"
+
+      - name: Publish DB to GitHub Release
+        run: |
+          gh release view db-latest --json tagName > /dev/null 2>&1 \
+            || gh release create db-latest \
+                --title "Database: latest" \
+                --notes "Auto-published SQLite database from ingest workflow." \
+                --prerelease
+          gh release upload db-latest database.db.gz --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Summary
+        run: |
+          echo "### Ingest complete" >> $GITHUB_STEP_SUMMARY
+          echo "DB published to release \`db-latest\` as \`database.db.gz\`." >> $GITHUB_STEP_SUMMARY
+          sqlite3 data/acn.db "
+            SELECT 'guidance rows: ' || COUNT(*) FROM guidance;
+            SELECT 'advisories rows: ' || COUNT(*) FROM advisories;
+            SELECT 'frameworks rows: ' || COUNT(*) FROM frameworks;
+          " >> $GITHUB_STEP_SUMMARY || true

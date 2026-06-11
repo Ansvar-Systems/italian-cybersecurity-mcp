@@ -1,0 +1,57 @@
+name: Check Data Freshness
+
+on:
+  schedule:
+    # Every Monday at 08:00 UTC
+    - cron: "0 8 * * 1"
+  workflow_dispatch:
+
+jobs:
+  check-freshness:
+    name: Check DB freshness
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download latest DB
+        run: |
+          gh release download db-latest --pattern "database.db.gz" --dir /tmp || true
+          if [ -f /tmp/database.db.gz ]; then
+            gunzip -f /tmp/database.db.gz
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+      - name: Check max document date
+        run: |
+          DB=/tmp/database.db
+          if [ ! -f "$DB" ]; then
+            echo "::warning::No database found — skipping freshness check."
+            exit 0
+          fi
+
+          MAX_DATE=$(sqlite3 "$DB" "
+            SELECT MAX(date_val) FROM (
+              SELECT date AS date_val FROM guidance WHERE date IS NOT NULL
+              UNION ALL
+              SELECT date AS date_val FROM advisories WHERE date IS NOT NULL
+            );
+          ")
+
+          echo "Most recent document date: $MAX_DATE"
+
+          if [ -z "$MAX_DATE" ] || [ "$MAX_DATE" = "NULL" ]; then
+            echo "::warning::Database contains no dated documents."
+            exit 0
+          fi
+
+          THRESHOLD=$(date -d "30 days ago" +%Y-%m-%d)
+          echo "30-day threshold: $THRESHOLD"
+
+          if [[ "$MAX_DATE" < "$THRESHOLD" ]]; then
+            echo "::error::Data is stale — most recent document ($MAX_DATE) is older than 30 days ($THRESHOLD)."
+            exit 1
+          fi
+
+          echo "Data is fresh."

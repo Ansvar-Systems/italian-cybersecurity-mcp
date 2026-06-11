@@ -29,7 +29,9 @@ import {
   searchAdvisories,
   getAdvisory,
   listFrameworks,
+  getDataAge,
 } from "./db.js";
+import { buildCitation } from "./utils/citation.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -156,6 +158,18 @@ const GetAdvisoryArgs = z.object({
   reference: z.string().min(1),
 });
 
+// --- Response helpers --------------------------------------------------------
+
+function responseMeta() {
+  return {
+    disclaimer:
+      "This data is provided for informational purposes only. Verify with official ACN/CSIRT-ITA sources before taking action.",
+    data_age: getDataAge(),
+    copyright: "© Agenzia per la Cybersicurezza Nazionale (ACN). All rights reserved.",
+    source_url: "https://www.acn.gov.it/",
+  };
+}
+
 // --- MCP server factory ------------------------------------------------------
 
 function createMcpServer(): Server {
@@ -177,9 +191,14 @@ function createMcpServer(): Server {
       };
     }
 
-    function errorContent(message: string) {
+    function errorContent(message: string, errorType = "tool_error") {
       return {
-        content: [{ type: "text" as const, text: message }],
+        content: [
+          {
+            type: "text" as const,
+            text: JSON.stringify({ error: message, _error_type: errorType, _meta: responseMeta() }, null, 2),
+          },
+        ],
         isError: true as const,
       };
     }
@@ -195,16 +214,38 @@ function createMcpServer(): Server {
             status: parsed.status,
             limit: parsed.limit,
           });
-          return textContent({ results, count: results.length });
+          const resultsWithCitations = results.map((r) => {
+            const d = r as Record<string, unknown>;
+            return {
+              ...r,
+              _citation: buildCitation(
+                String(d.reference ?? ""),
+                String(d.title ?? d.reference ?? ""),
+                "it_cyber_get_guidance",
+                { reference: String(d.reference ?? "") },
+              ),
+            };
+          });
+          return textContent({ results: resultsWithCitations, count: results.length, _meta: responseMeta() });
         }
 
         case "it_cyber_get_guidance": {
           const parsed = GetGuidanceArgs.parse(args);
           const doc = getGuidance(parsed.reference);
           if (!doc) {
-            return errorContent(`Guidance document not found: ${parsed.reference}`);
+            return errorContent(`Guidance document not found: ${parsed.reference}`, "not_found");
           }
-          return textContent(doc);
+          const d = doc as Record<string, unknown>;
+          return textContent({
+            ...doc,
+            _citation: buildCitation(
+              String(d.reference ?? parsed.reference),
+              String(d.title ?? d.reference ?? parsed.reference),
+              "it_cyber_get_guidance",
+              { reference: parsed.reference },
+            ),
+            _meta: responseMeta(),
+          });
         }
 
         case "it_cyber_search_advisories": {
@@ -214,21 +255,43 @@ function createMcpServer(): Server {
             severity: parsed.severity,
             limit: parsed.limit,
           });
-          return textContent({ results, count: results.length });
+          const resultsWithCitations = results.map((r) => {
+            const adv = r as Record<string, unknown>;
+            return {
+              ...r,
+              _citation: buildCitation(
+                String(adv.reference ?? ""),
+                String(adv.title ?? adv.reference ?? ""),
+                "it_cyber_get_advisory",
+                { reference: String(adv.reference ?? "") },
+              ),
+            };
+          });
+          return textContent({ results: resultsWithCitations, count: results.length, _meta: responseMeta() });
         }
 
         case "it_cyber_get_advisory": {
           const parsed = GetAdvisoryArgs.parse(args);
           const advisory = getAdvisory(parsed.reference);
           if (!advisory) {
-            return errorContent(`Advisory not found: ${parsed.reference}`);
+            return errorContent(`Advisory not found: ${parsed.reference}`, "not_found");
           }
-          return textContent(advisory);
+          const adv = advisory as Record<string, unknown>;
+          return textContent({
+            ...advisory,
+            _citation: buildCitation(
+              String(adv.reference ?? parsed.reference),
+              String(adv.title ?? adv.reference ?? parsed.reference),
+              "it_cyber_get_advisory",
+              { reference: parsed.reference },
+            ),
+            _meta: responseMeta(),
+          });
         }
 
         case "it_cyber_list_frameworks": {
           const frameworks = listFrameworks();
-          return textContent({ frameworks, count: frameworks.length });
+          return textContent({ frameworks, count: frameworks.length, _meta: responseMeta() });
         }
 
         case "it_cyber_about": {
@@ -239,15 +302,16 @@ function createMcpServer(): Server {
               "ACN (Agenzia per la Cybersicurezza Nazionale) MCP server. Provides access to ACN guidance including Piano Strategico Nazionale per la Cybersicurezza, Misure Minime di Sicurezza, and CSIRT-ITA advisories.",
             data_source: "ACN (https://www.acn.gov.it/)",
             tools: TOOLS.map((t) => ({ name: t.name, description: t.description })),
+            _meta: responseMeta(),
           });
         }
 
         default:
-          return errorContent(`Unknown tool: ${name}`);
+          return errorContent(`Unknown tool: ${name}`, "unknown_tool");
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      return errorContent(`Error executing ${name}: ${message}`);
+      return errorContent(`Error executing ${name}: ${message}`, "internal_error");
     }
   });
 
